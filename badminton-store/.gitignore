@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+dist-ssr/
+
+# Spring Boot
+**/target/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+*.local
