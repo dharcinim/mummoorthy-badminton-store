@@ -1,13 +1,18 @@
-
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+
 import ProductCard from "../components/ProductCard";
 import FilterBar from "../components/FilterBar";
-import products from "../data/product";
+
+import { getProducts } from "../services/productService";
 
 const defaultFilters = {
   category: "All",
   brand: "All Brands",
+  weight: "All",
+  flexibility: "All",
+  playingLevel: "All",
+
   sort: "newest",
   maxPrice: 20000,
   search: "",
@@ -16,387 +21,363 @@ const defaultFilters = {
 };
 
 function Products() {
-  const [filters, setFilters] = useState(defaultFilters);
+
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Read ?search= from URL on mount
-  useEffect(() => {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  //alert("Products Render");
+  const [filters, setFilters] = useState(defaultFilters);
+
+  const [view, setView] = useState("grid");
+
+    useEffect(() => {
+
     const q = searchParams.get("search");
-    if (q) setFilters((prev) => ({ ...prev, search: q }));
+
+    if (q) {
+
+      setFilters((prev) => ({
+        ...prev,
+        search: q,
+      }));
+
+    }
+
   }, [searchParams]);
-  const [view, setView] = useState("grid"); // "grid" | "list"
-  const navigate = useNavigate();
 
-  // ── Apply Filters & Sort ─────────────────────────────────
-  const filtered = useMemo(() => {
+    useEffect(() => {
+
+    const loadProducts = async () => {
+
+      try {
+
+        const data = await getProducts();
+
+        const mappedProducts = data.map((p) => ({
+
+          ...p,
+
+          brand: p.brandName,
+          category: p.categoryName,
+
+          image: p.imageUrl,
+
+          price: p.sellingPrice,
+          oldPrice: p.mrp,
+
+          isNew: p.newArrival,
+          isBestSeller: p.bestSeller,
+
+          weight: p.weight,
+          flexibility: p.flexibility,
+          playingLevel: p.playingLevel,
+          balance: p.balance,
+          frameMaterial: p.frameMaterial,
+
+        }));
+
+        setProducts(mappedProducts);
+
+      } catch (error) {
+
+        console.error(error);
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+    loadProducts();
+
+  }, []);
+
+    const filteredProducts = useMemo(() => {
+   // throw new Error("USEMEMO IS RUNNING");
     let result = [...products];
+    console.log("FILTER STATE:", filters);
 
-    // Search
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
-          (p.tags && p.tags.some((t) => t.includes(q)))
+    
+
+    // ---------------- SEARCH ----------------
+
+    if (filters.search.trim() !== "") {
+
+      const keyword = filters.search.toLowerCase();
+
+      result = result.filter((product) =>
+
+        product.name?.toLowerCase().includes(keyword) ||
+
+        product.brand?.toLowerCase().includes(keyword) ||
+
+        product.category?.toLowerCase().includes(keyword)
+
       );
+
     }
 
-    // Category
+    // ---------------- CATEGORY ----------------
+
     if (filters.category !== "All") {
-      result = result.filter((p) => p.category === filters.category);
+
+      result = result.filter(
+
+        (product) => product.category === filters.category
+
+      );
+
     }
 
-    // Brand
+    // ---------------- BRAND ----------------
+
     if (filters.brand !== "All Brands") {
-      result = result.filter((p) => p.brand === filters.brand);
+
+      result = result.filter(
+
+        (product) => product.brand === filters.brand
+
+      );
+
     }
 
-    // Price
-    result = result.filter((p) => p.price <= filters.maxPrice);
+    // ---------------- WEIGHT ----------------
 
-    // New / BestSeller toggles
-    if (filters.onlyNew) result = result.filter((p) => p.isNew);
-    if (filters.onlyBestSeller) result = result.filter((p) => p.isBestSeller);
+if (filters.weight !== "All") {
+  result = result.filter(
+    (product) => product.weight === filters.weight
+  );
+}
 
-    // Sort
+// ---------------- FLEXIBILITY ----------------
+
+if (filters.flexibility !== "All") {
+  result = result.filter(
+    (product) => product.flexibility === filters.flexibility
+  );
+}
+
+// ---------------- PLAYING LEVEL ----------------
+
+if (filters.playingLevel !== "All") {
+  console.log("Selected:", filters.playingLevel);
+
+  console.table(
+    result.map(p => ({
+      name: p.name,
+      playingLevel: p.playingLevel
+    }))
+  );
+
+  result = result.filter(
+    (product) => product.playingLevel?.trim() === filters.playingLevel.trim()
+  );
+}
+
+    // ---------------- PRICE ----------------
+
+    result = result.filter(
+
+      (product) => product.price <= filters.maxPrice
+
+    );
+
+    // ---------------- NEW ARRIVAL ----------------
+
+    if (filters.onlyNew) {
+
+      result = result.filter(
+
+        (product) => product.isNew
+
+      );
+
+    }
+
+    // ---------------- BEST SELLER ----------------
+
+    if (filters.onlyBestSeller) {
+
+      result = result.filter(
+
+        (product) => product.isBestSeller
+
+      );
+
+    }
+
+    // ---------------- SORT ----------------
+
     switch (filters.sort) {
-      case "price_asc":
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case "price_desc":
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case "rating":
-        result.sort((a, b) => b.rating - a.rating);
-        break;
-      case "popular":
-        result.sort((a, b) => b.reviews - a.reviews);
-        break;
-      default:
-        // newest — keep original order (id desc)
-        result.sort((a, b) => b.id - a.id);
-    }
 
+      case "price_asc":
+
+        result.sort((a, b) => a.price - b.price);
+
+        break;
+
+      case "price_desc":
+
+        result.sort((a, b) => b.price - a.price);
+
+        break;
+
+      default:
+
+        result.sort((a, b) => b.id - a.id);
+
+    }
+    console.log(filters);
     return result;
-  }, [filters]);
+
+  }, [products, filters]);
+
+    if (loading) {
+
+    return (
+      <div
+        style={{
+          textAlign: "center",
+          padding: "80px",
+          fontSize: "22px",
+          fontWeight: "bold",
+        }}
+      >
+        Loading Products...
+      </div>
+    );
+
+  }
 
   return (
-    <div style={styles.page}>
 
-      {/* ── PAGE HEADER ───────────────────────────────────── */}
-      <div style={styles.pageHeader}>
-        <div>
-          <h1 style={styles.title}>🏸 Shop All Products</h1>
-          <p style={styles.subtitle}>
-            {filtered.length} product{filtered.length !== 1 ? "s" : ""} found
-          </p>
-        </div>
+    <div
+  style={{
+    display: "flex",
+    gap: "25px",
+    padding: "30px",
+    background: "#f8f9fa",
+    minHeight: "100vh",
+  }}
+>
 
-        {/* View Toggle */}
-        <div style={styles.viewToggle}>
-          <button
-            onClick={() => setView("grid")}
-            style={{
-              ...styles.viewBtn,
-              background: view === "grid" ? "#0066FF" : "#F5F7FA",
-              color: view === "grid" ? "#fff" : "#111",
+  <div
+    style={{
+      width: "280px",
+      flexShrink: 0,
+    }}
+  >
+
+    <FilterBar
+      filters={filters}
+       setFilters={setFilters}
+      
+    />
+
+  </div>
+
+  <div
+    style={{
+      flex: 1,
+    }}
+  >
+
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "20px",
+      }}
+    >
+
+     
+
+      <h2>{filteredProducts.length} Products Found</h2>
+
+      <div>
+
+        <button
+          onClick={() => setView("grid")}
+          style={{
+            padding: "10px 18px",
+            background: view === "grid" ? "#000" : "#fff",
+            color: view === "grid" ? "#fff" : "#000",
+            border: "1px solid #000",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "600",
+            transition: "0.3s",
+            marginRight: "10px",
+          }}
+        >
+          ⊞ Grid
+        </button>
+
+        <button
+          onClick={() => setView("list")}
+          style={{
+              padding: "10px 18px",
+              background: view === "list" ? "#000" : "#fff",
+              color: view === "list" ? "#fff" : "#000",
+              border: "1px solid #000",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "600",
+              transition: "0.3s",
             }}
-          >
-            ⊞ Grid
-          </button>
-          <button
-            onClick={() => setView("list")}
-            style={{
-              ...styles.viewBtn,
-              background: view === "list" ? "#0066FF" : "#F5F7FA",
-              color: view === "list" ? "#fff" : "#111",
-            }}
-          >
-            ≡ List
-          </button>
-        </div>
+        >
+          ☰ List
+        </button>
+
       </div>
 
-      {/* ── MAIN LAYOUT ───────────────────────────────────── */}
-      <div style={styles.layout}>
-
-        {/* Sidebar Filters */}
-        <FilterBar filters={filters} setFilters={setFilters} />
-
-        {/* Product Grid/List */}
-        <main style={styles.main}>
-          {filtered.length === 0 ? (
-            <div style={styles.empty}>
-              <div style={{ fontSize: "60px" }}>🏸</div>
-              <h3 style={{ marginTop: "16px", fontSize: "20px" }}>No products found</h3>
-              <p style={{ color: "#6B7280" }}>Try adjusting your filters</p>
-              <button
-                onClick={() =>
-                  setFilters(defaultFilters)
-                }
-                style={styles.clearBtn}
-              >
-                Clear Filters
-              </button>
-            </div>
-          ) : (
-            <div
-              style={
-                view === "grid"
-                  ? styles.grid
-                  : styles.listView
-              }
-            >
-              {filtered.map((product) => (
-                <div
-                  key={product.id}
-                  style={view === "list" ? styles.listCard : {}}
-                >
-                  {view === "list" ? (
-                    /* LIST VIEW CARD */
-                    <div style={styles.listCardInner}>
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        style={styles.listImage}
-                        onError={(e) => {
-                          e.target.src =
-                            "https://via.placeholder.com/120x120?text=No+Image";
-                        }}
-                      />
-                      <div style={styles.listInfo}>
-                        <div style={styles.listBadges}>
-                          {product.isNew && (
-                            <span style={styles.newBadge}>NEW</span>
-                          )}
-                          {product.isBestSeller && (
-                            <span style={styles.bestBadge}>BEST SELLER</span>
-                          )}
-                        </div>
-                        <h3 style={styles.listName}>{product.name}</h3>
-                        <p style={styles.listBrand}>{product.brand} · {product.category}</p>
-                        <p style={styles.listDesc}>{product.description?.slice(0, 100)}...</p>
-                        <div style={styles.listRating}>
-                          {"⭐".repeat(Math.floor(product.rating))}
-                          <span style={{ color: "#6B7280", fontSize: "13px", marginLeft: "6px" }}>
-                            ({product.reviews})
-                          </span>
-                        </div>
-                      </div>
-                      <div style={styles.listPriceCol}>
-                        <span style={styles.listOldPrice}>₹{product.oldPrice?.toLocaleString()}</span>
-                        <span style={styles.listPrice}>₹{product.price.toLocaleString()}</span>
-                        <span style={styles.discountBadge}>-{product.discount}%</span>
-                        <button
-                          style={styles.listCartBtn}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // addToCart handled in ProductCard
-                          }}
-                        >
-                          View Product →
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* GRID VIEW CARD */
-                    <ProductCard
-                      product={product}
-                      showNew={product.isNew}
-                      showBest={product.isBestSeller}
-                      isDark={false}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </main>
-      </div>
     </div>
+
+        <div
+      style={{
+        display: view === "grid" ? "grid" : "flex",
+        gridTemplateColumns:
+          view === "grid"
+            ? "repeat(auto-fill, minmax(260px, 1fr))"
+            : "none",
+        flexDirection: view === "list" ? "column" : undefined,
+        gap: "20px",
+      }}
+    >
+      {filteredProducts.length === 0 ? (
+
+        <h2>No Products Found</h2>
+
+      ) : (
+
+        filteredProducts.map((product) => (
+
+          <ProductCard
+            key={product.id}
+            product={product}
+            showNew={product.isNew}
+            showBest={product.isBestSeller}
+          />
+
+        ))
+
+      )}
+    </div>
+
+  </div>
+
+</div>
+
+   
+
   );
+
 }
 
 export default Products;
 
-// ─── STYLES ─────────────────────────────────────────────────
-const styles = {
-  page: {
-    maxWidth: "1400px",
-    margin: "0 auto",
-    padding: "30px 20px 60px",
-    fontFamily: "sans-serif",
-  },
-  pageHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginBottom: "28px",
-    flexWrap: "wrap",
-    gap: "12px",
-  },
-  title: {
-    fontSize: "28px",
-    fontWeight: "800",
-    color: "#111",
-    margin: 0,
-  },
-  subtitle: {
-    color: "#6B7280",
-    marginTop: "4px",
-    fontSize: "14px",
-  },
-  viewToggle: {
-    display: "flex",
-    gap: "8px",
-  },
-  viewBtn: {
-    padding: "8px 18px",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "600",
-    fontSize: "14px",
-    transition: "all 0.2s",
-  },
-  layout: {
-    display: "flex",
-    gap: "28px",
-    alignItems: "flex-start",
-  },
-  main: {
-    flex: 1,
-    minWidth: 0,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-    gap: "20px",
-  },
-  listView: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  listCard: {
-    background: "#fff",
-    borderRadius: "14px",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-    cursor: "pointer",
-    transition: "box-shadow 0.2s",
-    overflow: "hidden",
-  },
-  listCardInner: {
-    display: "flex",
-    gap: "20px",
-    padding: "20px",
-    alignItems: "center",
-  },
-  listImage: {
-    width: "120px",
-    height: "120px",
-    objectFit: "contain",
-    borderRadius: "10px",
-    background: "#F5F7FA",
-    flexShrink: 0,
-  },
-  listInfo: {
-    flex: 1,
-  },
-  listBadges: {
-    display: "flex",
-    gap: "6px",
-    marginBottom: "6px",
-  },
-  newBadge: {
-    background: "linear-gradient(45deg,#00e676,#00c853)",
-    color: "#000",
-    fontSize: "10px",
-    padding: "2px 8px",
-    borderRadius: "20px",
-    fontWeight: "700",
-  },
-  bestBadge: {
-    background: "linear-gradient(45deg,#ff9800,#ff5722)",
-    color: "#fff",
-    fontSize: "10px",
-    padding: "2px 8px",
-    borderRadius: "20px",
-    fontWeight: "700",
-  },
-  listName: {
-    margin: "0 0 4px",
-    fontSize: "17px",
-    fontWeight: "700",
-    color: "#111",
-  },
-  listBrand: {
-    fontSize: "13px",
-    color: "#0066FF",
-    marginBottom: "6px",
-  },
-  listDesc: {
-    fontSize: "13px",
-    color: "#6B7280",
-    lineHeight: "1.5",
-    marginBottom: "8px",
-  },
-  listRating: {
-    fontSize: "13px",
-  },
-  listPriceCol: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-end",
-    gap: "6px",
-    minWidth: "130px",
-  },
-  listOldPrice: {
-    textDecoration: "line-through",
-    color: "#6B7280",
-    fontSize: "13px",
-  },
-  listPrice: {
-    fontWeight: "800",
-    fontSize: "20px",
-    color: "#111",
-  },
-  discountBadge: {
-    background: "#ff3b3b",
-    color: "#fff",
-    fontSize: "12px",
-    padding: "2px 8px",
-    borderRadius: "5px",
-    fontWeight: "600",
-  },
-  listCartBtn: {
-    marginTop: "8px",
-    padding: "9px 16px",
-    background: "#0066FF",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "600",
-    fontSize: "13px",
-    whiteSpace: "nowrap",
-  },
-  empty: {
-    textAlign: "center",
-    padding: "80px 20px",
-    color: "#111",
-  },
-  clearBtn: {
-    marginTop: "20px",
-    padding: "12px 28px",
-    background: "#0066FF",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "600",
-    fontSize: "15px",
-  },
-};

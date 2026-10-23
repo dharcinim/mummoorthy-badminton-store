@@ -219,7 +219,7 @@ export default function Footer() {
 }
 
 const s = {
-  footer: { background: "#0a0a0a", color: "#555", padding: "0 40px 30px", fontFamily: "'Inter', sans-serif", borderTop: "1px solid #1a1a1a" },
+  footer: { background: "#080808", color: "#f6f3f3", padding: "0 40px 30px", fontFamily: "'Inter', sans-serif", borderTop: "1px solid #1a1a1a" },
   topGlow: { height: "1px", background: "linear-gradient(90deg, transparent, #00FF9C33, #0066FF33, transparent)", marginBottom: "60px" },
   grid: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1.5fr", gap: "40px", marginBottom: "50px" },
   col: { display: "flex", flexDirection: "column", gap: "12px" },

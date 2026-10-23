@@ -1,83 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { getProducts } from "../services/productService";
 
-// ── String catalogue ──────────────────────────────────────────
-const strings = [
-  {
-    id: 1,
-    name: "Yonex BG 65",
-    brand: "Yonex",
-    gauge: "0.70mm",
-    type: "Durability",
-    feel: "Crisp",
-    price: 350,
-    bestFor: "All-round players",
-    color: "#FFD700",
-    tag: "Most Popular",
-  },
-  {
-    id: 2,
-    name: "Yonex BG 66 Ultimax",
-    brand: "Yonex",
-    gauge: "0.65mm",
-    type: "Repulsion",
-    feel: "Sharp",
-    price: 500,
-    bestFor: "Attacking players",
-    color: "#00FF9C",
-    tag: "Pro Choice",
-  },
-  {
-    id: 3,
-    name: "Yonex Aerosonic",
-    brand: "Yonex",
-    gauge: "0.61mm",
-    type: "Control",
-    feel: "Soft",
-    price: 600,
-    bestFor: "Control & touch players",
-    color: "#4FC3F7",
-    tag: "Ultra-thin",
-  },
-  {
-    id: 4,
-    name: "Yonex NBG 99",
-    brand: "Yonex",
-    gauge: "0.69mm",
-    type: "Power",
-    feel: "Medium",
-    price: 450,
-    bestFor: "Power smashers",
-    color: "#FF7043",
-    tag: "High Power",
-  },
-  {
-    id: 5,
-    name: "Li-Ning No.1",
-    brand: "Li-Ning",
-    gauge: "0.65mm",
-    type: "Repulsion",
-    feel: "Lively",
-    price: 420,
-    bestFor: "Speed players",
-    color: "#CE93D8",
-    tag: "New",
-  },
-  {
-    id: 6,
-    name: "Victor VBS-70 Power",
-    brand: "Victor",
-    gauge: "0.70mm",
-    type: "Durability",
-    feel: "Firm",
-    price: 380,
-    bestFor: "Beginners & training",
-    color: "#80CBC4",
-    tag: "Budget Pick",
-  },
-];
+// String options are loaded from the same Spring Boot catalogue as the storefront.
+const stringColors = ["#FFD700", "#00FF9C", "#4FC3F7", "#FF7043", "#CE93D8", "#80CBC4"];
 
 const tensionGuide = [
   { range: "18–22 lbs", label: "Beginner", desc: "Larger sweet spot, more power", color: "#4CAF50" },
@@ -105,15 +33,75 @@ const faqs = [
 export default function RacketStringing() {
   const navigate = useNavigate();
   const [selectedString, setSelectedString] = useState(null);
+  const [availableStrings, setAvailableStrings] = useState([]);
+  const [stringsLoading, setStringsLoading] = useState(true);
+  const [stringsError, setStringsError] = useState("");
   const [tension, setTension] = useState(24);
   const [openFaq, setOpenFaq] = useState(null);
   const [form, setForm] = useState({ name: "", phone: "", date: "", time: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadStrings = async () => {
+      setStringsLoading(true);
+      setStringsError("");
+      try {
+        const products = await getProducts();
+        const stringProducts = (Array.isArray(products) ? products : [])
+          .filter((product) => {
+            const category = String(product.categoryName || product.category || "").toLowerCase();
+            const stock = Number(product.stock ?? 0);
+            const price = Number(product.sellingPrice ?? product.price ?? 0);
+            return category.includes("string")
+              && product.active !== false
+              && stock > 0
+              && price > 0;
+          })
+          .map((product, index) => ({
+            id: product.id,
+            name: product.name,
+            brand: product.brandName || product.brand || "Badminton String",
+            price: Number(product.sellingPrice ?? product.price),
+            gauge: product.gauge || product.shortDescription || "See product details",
+            type: product.type || "Badminton String",
+            feel: product.feel || "See product details",
+            bestFor: product.shortDescription || "Everyday play",
+            color: stringColors[index % stringColors.length],
+            tag: "In Stock",
+            stock: Number(product.stock),
+          }));
+
+        if (isMounted) {
+          setAvailableStrings(stringProducts);
+          setSelectedString((current) =>
+            current ? stringProducts.find((item) => item.id === current.id) || null : null
+          );
+        }
+      } catch (error) {
+        console.error("Unable to load string products:", error);
+        if (isMounted) setStringsError("Could not load strings from the store catalogue. Check that the backend is running.");
+      } finally {
+        if (isMounted) setStringsLoading(false);
+      }
+    };
+
+    loadStrings();
+    return () => { isMounted = false; };
+  }, []);
 
   const totalPrice = selectedString ? selectedString.price + 150 : 150; // string + labor
+  const advanceAmount = Number((totalPrice * 0.5).toFixed(2));
+  const balanceAmount = Number((totalPrice - advanceAmount).toFixed(2));
 
   const handleBook = async () => {
-  if (!form.name || !form.phone || !form.date) return;
+  if (!form.name || !form.phone || !form.date || !form.time || !selectedString) {
+    setBookingError("Please select an available string, date, and time slot.");
+    return;
+  }
+  setBookingError("");
   try {
     await addDoc(collection(db, "bookings"), {
       type: "stringing",
@@ -125,10 +113,16 @@ export default function RacketStringing() {
       string: selectedString ? selectedString.name : "To be selected in-store",
       tension: tension,
       totalPrice,
-      status: "Pending",
+      advanceAmount,
+      balanceAmount,
+      paymentStatus: "Pending Payment",
+      status: "Pending Payment",
       createdAt: new Date().toISOString(),
     });
-  } catch (e) { console.error(e); }
+  } catch (e) {  console.error("BOOKING SAVE ERROR:", e.code, e.message);
+  setBookingError(`${e.code || "Error"}: ${e.message}`);
+  return;
+}
   setSubmitted(true);
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
@@ -138,9 +132,9 @@ export default function RacketStringing() {
       <div style={pg.successPage}>
         <div style={pg.successBox}>
           <div style={pg.successIcon}></div>
-          <h2 style={pg.successTitle}>Booking Confirmed!</h2>
+          <h2 style={pg.successTitle}>Booking Request Received</h2>
           <p style={pg.successSub}>
-            Thank you, <strong>{form.name}</strong>! Your racket stringing appointment is booked for{" "}
+            Thank you, <strong>{form.name}</strong>! Your racket stringing request is saved for{" "}
             <strong>{form.date}</strong> at <strong>{form.time || "your preferred time"}</strong>.
           </p>
           <div style={pg.successDetails}>
@@ -153,12 +147,14 @@ export default function RacketStringing() {
               <span>{tension} lbs</span>
             </div>
             <div style={pg.successRow}>
-              <span>Estimated Cost</span>
-              <span style={{ color: "#00FF9C", fontWeight: "700" }}>₹{totalPrice}</span>
+              <span>Estimated Total</span>
+              <span style={{ color: "#00FF9C", fontWeight: "700" }}>₹{totalPrice.toFixed(2)}</span>
             </div>
+            <div style={pg.successRow}><span>50% advance (online)</span><span>₹{advanceAmount.toFixed(2)}</span></div>
+            <div style={pg.successRow}><span>Balance at shop</span><span>₹{balanceAmount.toFixed(2)}</span></div>
           </div>
-          <p style={{ fontSize: "13px", color: "#555", marginBottom: "28px" }}>
-            We'll call you on <strong>{form.phone}</strong> to confirm. See you at the store!
+          <p style={{ fontSize: "13px", color: "#888", marginBottom: "28px" }}>
+            Payment gateway is not connected yet. Your request is pending payment and is not confirmed. We'll contact you on <strong>{form.phone}</strong>.
           </p>
           <button onClick={() => navigate("/")} style={pg.homeBtn}>← Back to Home</button>
         </div>
@@ -257,10 +253,16 @@ export default function RacketStringing() {
         <section style={pg.section}>
           <div style={pg.sectionBadge}>STRING CATALOGUE</div>
           <h2 style={pg.sectionTitle}>Choose Your String</h2>
-          <p style={pg.sectionSub}>20+ premium strings. Select now or choose in-store with our stringer's guidance.</p>
+          <p style={pg.sectionSub}>Choose from badminton strings currently in stock in the store catalogue.</p>
+
+          {stringsLoading && <p style={pg.sectionSub}>Loading available strings…</p>}
+          {stringsError && <p role="alert" style={{ ...pg.sectionSub, color: "#ff6b6b" }}>{stringsError}</p>}
+          {!stringsLoading && !stringsError && availableStrings.length === 0 && (
+            <p style={pg.sectionSub}>No in-stock products were found in the Strings category. Please check product category and stock in the admin catalogue.</p>
+          )}
 
           <div style={pg.stringGrid}>
-            {strings.map((str) => (
+            {availableStrings.map((str) => (
               <div
                 key={str.id}
                 onClick={() => setSelectedString(selectedString?.id === str.id ? null : str)}
@@ -352,13 +354,13 @@ export default function RacketStringing() {
                   />
                 </div>
                 <div style={{ ...pg.formGroup, flex: 1 }}>
-                  <label style={pg.formLabel}>Preferred Time</label>
+                  <label style={pg.formLabel}>Preferred Time *</label>
                   <select
                     style={pg.formSelect}
                     value={form.time}
                     onChange={(e) => setForm({ ...form, time: e.target.value })}
                   >
-                    <option value="">Select time</option>
+                    <option value="">Select time *</option>
                     {["9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM"].map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
@@ -407,17 +409,18 @@ export default function RacketStringing() {
                 <span style={{ color: "#00FF9C" }}>₹{totalPrice}</span>
               </div>
 
-              <div style={pg.summaryNote}>
-                Final price confirmed in-store after racket inspection.
-              </div>
+              <div style={pg.summaryItem}><span style={pg.summaryKey}>50% Advance</span><span style={{ ...pg.summaryVal, color: "#00FF9C" }}>₹{advanceAmount.toFixed(2)}</span></div>
+              <div style={pg.summaryItem}><span style={pg.summaryKey}>Balance at shop</span><span style={pg.summaryVal}>₹{balanceAmount.toFixed(2)}</span></div>
+              <div style={pg.summaryNote}>Online payment is not integrated yet. Booking remains pending payment until a real payment is verified.</div>
+              {bookingError && <p role="alert" style={{ color: "#ff6b6b", fontSize: "12px" }}>{bookingError}</p>}
 
               <button
                 onClick={handleBook}
-                disabled={!form.name || !form.phone || !form.date}
+                disabled={!form.name || !form.phone || !form.date || !form.time || !selectedString}
                 style={{
                   ...pg.bookBtn,
-                  opacity: (!form.name || !form.phone || !form.date) ? 0.5 : 1,
-                  cursor: (!form.name || !form.phone || !form.date) ? "not-allowed" : "pointer",
+                  opacity: (!form.name || !form.phone || !form.date || !form.time || !selectedString) ? 0.5 : 1,
+                  cursor: (!form.name || !form.phone || !form.date || !form.time || !selectedString) ? "not-allowed" : "pointer",
                 }}
               >
                 Confirm Booking →

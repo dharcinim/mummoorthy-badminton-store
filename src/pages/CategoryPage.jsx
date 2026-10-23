@@ -1,21 +1,102 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { getProductsByCategory } from "../services/categoryService";
+import { getProducts } from "../services/productService";
 import ProductCard from "../components/ProductCard";
 
 
 const sortOptions = ["Default", "Price: Low to High", "Price: High to Low", "Newest"];
 
+const normalizeCategory = (value = "") => {
+  const key = String(value).toLowerCase().trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+  const aliases = {
+    "kits": "kit bags", "kitbags": "kit bags", "bags": "kit bags", "kit bag": "kit bags",
+    "shuttle": "shuttlecocks", "shuttles": "shuttlecocks", "shuttlecock": "shuttlecocks",
+    "fitness training equipment": "fitness equipment", "training equipment": "fitness equipment",
+    "grip": "grips", "racket": "rackets", "shoe": "shoes", "string": "strings",
+    "accessory": "accessories"
+  };
+  return aliases[key] || key;
+};
+
+const normalizeAudience = (value = "") =>
+  String(value ?? "").trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+
+const getProductAudience = (p) => {
+  const audience = normalizeAudience(
+    p.gender ??
+    p.targetAudience ??
+    p.audience ??
+    p.productGender ??
+    p.specifications?.gender ??
+    p.specifications?.targetAudience ??
+    p.subCategoryName ??
+    p.subCategory?.name ??
+    ""
+  );
+
+  if (audience) return audience;
+
+  const description = normalizeAudience(
+    `${p.name || ""} ${p.shortDescription || ""} ${p.description || ""}`
+  );
+
+  if (/\b(unisex|adult unisex)\b/.test(description)) {
+    return "unisex";
+  }
+
+  if (/\b(kids|kid|children|child|junior|youth)\b/.test(description)) {
+    return "kids";
+  }
+
+  if (/\b(women|woman|womens|female|ladies)\b/.test(description)) {
+    return "women";
+  }
+
+  if (/\b(men|mens|male)\b/.test(description)) {
+    return "men";
+  }
+
+  return "";
+};
+
+const collectionTitles = {
+  men: "Men Collection",
+  women: "Women Collection",
+  kids: "Kids Collection",
+};
+
+
 // Racket
+
 const flexibilityOptions = ["Extra Stiff", "Stiff", "Medium", "Flexible", "Extra Flexible"];
-const weightOptions      = ["70–75g", "75–80g", "80–85g", "85–90g"];
-const levelOptions       = ["Beginner", "Intermediate", "Advanced", "Professional", "Junior"];
+const weightOptions = [
+  { label: "70–75g", value: "6U" },
+  { label: "75–80g", value: "5U" },
+  { label: "80–85g", value: "4U" },
+  { label: "85–90g", value: "3U" },
+  { label: "90–95g", value: "2U" },
+];
+const levelOptions = [
+  { label: "Beginner", value: "Beginner" },
+  { label: "Intermediate", value: "Intermediate" },
+  { label: "Intermediate", value: "Intermediate to Advanced" },
+  { label: "Advanced", value: "Advanced" },
+  { label: "Professional", value: "Professional" },
+  { label: "Junior", value: "Junior" },
+];
+
 
 // Shoe sizes
-const shoeSizes = [];
-for (let i = 1; i <= 12; i += 0.5) {
-  shoeSizes.push(`UK ${i % 1 === 0 ? i : i.toFixed(1)}`);
-}
+const shoeSizes = [
+  "UK 1", "UK 1.5", "UK 2", "UK 2.5",
+  "UK 3", "UK 3.5", "UK 4", "UK 4.5",
+  "UK 5", "UK 5.5", "UK 6", "UK 6.5",
+  "UK 7", "UK 7.5", "UK 8", "UK 8.5",
+  "UK 9", "UK 9.5", "UK 10", "UK 10.5",
+  "UK 11", "UK 11.5", "UK 12"
+];
+
 
 // Others
 const shuttleTypes    = ["Feather", "Nylon", "Hybrid"];
@@ -28,15 +109,32 @@ const bagTypes        = ["Backpack", "Duffle Bag", "Kit Bag", "Tournament Bag"];
 function CategoryPage() {
   const { category } = useParams();
     const [products, setProducts] = useState([]);
+    const shoeSizes = [...new Set(
+  products
+    .filter((p) => p.sizes)
+    .flatMap((p) =>
+      Array.isArray(p.sizes)
+        ? p.sizes
+        : typeof p.sizes === "string"
+        ? p.sizes.split(",").map((s) => s.trim())
+        : []
+    )
+)].sort((a, b) => {
+  const numA = parseFloat(a.replace("UK ", ""));
+  const numB = parseFloat(b.replace("UK ", ""));
+  return numA - numB;
+});
 
-  const isRacket    = category === "rackets";
-  const isShoe      = category === "shoes";
-  const isShuttle   = category === "shuttles";
-  const isString    = category === "strings";
-  const isGrip      = category === "grips";
-  const isClothing  = category === "clothing";
-  const isAccessory = category === "accessories";
-  const isKit       = category === "kit";
+  const normalizedCategory = normalizeCategory(category);
+  const isRacket    = normalizedCategory === "rackets";
+  const isShoe      = normalizedCategory === "shoes";
+  const isShuttle   = normalizedCategory === "shuttlecocks";
+  const isString    = normalizedCategory === "strings";
+  const isGrip      = normalizedCategory === "grips";
+  const isClothing  = normalizedCategory === "clothing";
+  const isAccessory = normalizedCategory === "accessories";
+  const isKit       = normalizedCategory === "kit bags";
+  const isFitness   = normalizedCategory === "fitness equipment";
 
 
 
@@ -57,6 +155,7 @@ function CategoryPage() {
   // Clothing
   const [clothingCat, setClothingCat]   = useState([]);
   const [clothingSize, setClothingSize] = useState([]);
+  
 
   // Accessory
   const [accessoryType, setAccessoryType] = useState([]);
@@ -73,16 +172,25 @@ function CategoryPage() {
     const loadProducts = async () => {
 
         try {
+            // Prefer the category endpoint, but fall back to the full catalogue.
+            // This protects categories such as "Kit Bags" when the route slug and
+            // backend category name differ (kit-bags vs Kit Bags).
+            let data = [];
+            try {
+                data = await getProductsByCategory(category);
+            } catch (categoryError) {
+                console.warn("Category endpoint failed; loading full catalogue", categoryError);
+            }
 
-            const data =
-                await getProductsByCategory(category);
+            if (!Array.isArray(data) || data.length === 0) {
+                data = await getProducts();
+            }
 
-            setProducts(data);
+            setProducts(Array.isArray(data) ? data : []);
 
         } catch (error) {
-
-            console.error(error);
-
+            console.error("Unable to load category products:", error);
+            setProducts([]);
         }
 
     };
@@ -105,31 +213,62 @@ function CategoryPage() {
     setMinPrice(""); setMaxPrice("");
   };
 
+  const isCollection = Object.prototype.hasOwnProperty.call(collectionTitles, normalizedCategory);
+
   let filtered = products.filter((p) => {
-    if (p.categoryName?.toLowerCase() !== category.toLowerCase()) return false;
+    const productCategory = normalizeCategory(p.categoryName || p.category?.name || "");
+
+    // Collections span multiple product categories, so filter by audience first.
+    if (isCollection) {
+      const audience = getProductAudience(p);
+      if (normalizedCategory === "men") {
+        return ["men", "male", "mens", "unisex", "all", "adult unisex"].includes(audience);
+      }
+      if (normalizedCategory === "women") {
+        return ["women", "woman", "female", "womens", "unisex", "all", "adult unisex"].includes(audience);
+      }
+      // Kids gets explicitly child/junior products, plus unisex items marked for kids.
+      return ["kids", "kid", "children", "child", "junior", "youth", "unisex kids", "kids unisex"].includes(audience);
+    }
+
+    if (productCategory !== normalizedCategory) return false;
     if (isRacket) {
       if (flexibility.length && !flexibility.includes(p.flexibility)) return false;
       if (weight.length && !weight.includes(p.weight))               return false;
-      if (level.length && !level.includes(p.level))                  return false;
+      if (level.length && !level.includes(p.playingLevel))                  return false;
     }
     if (isShoe) {
-      if (sizes.length && !sizes.some((s) => p.sizes?.includes(s))) return false;
+     if (sizes.length) {
+    const productSizes = Array.isArray(p.sizes)
+      ? p.sizes
+      : typeof p.sizes === "string"
+      ? p.sizes.split(",").map((s) => s.trim())
+      : [];
+
+    if (!sizes.some((s) => productSizes.includes(s))) {
+      return false;
+    }
+  }
     }
     if (isShuttle) {
-      if (shuttleType.length && !shuttleType.includes(p.shuttleType)) return false;
+      if (shuttleType.length && !shuttleType.includes(p.shuttleType || p.type || p.specifications?.type)) return false;
     }
     if (isGrip) {
-      if (gripType.length && !gripType.includes(p.gripType)) return false;
+      if (gripType.length && !gripType.includes(p.gripType || p.gripCategory || p.subCategoryName)) return false;
     }
     if (isClothing) {
-      if (clothingCat.length && !clothingCat.includes(p.gender))           return false;
-      if (clothingSize.length && !clothingSize.some((s) => p.sizes?.includes(s))) return false;
+      if (clothingCat.length && !clothingCat.includes(p.gender)) return false;
+      const productSizes = Array.isArray(p.sizes) ? p.sizes : typeof p.sizes === "string" ? p.sizes.split(",").map((s) => s.trim()) : [];
+      if (clothingSize.length && !clothingSize.some((s) => productSizes.includes(s))) return false;
     }
     if (isAccessory) {
-      if (accessoryType.length && !accessoryType.includes(p.accessoryType)) return false;
+      if (accessoryType.length && !accessoryType.includes(p.accessoryType || p.subCategoryName || p.subCategory?.name)) return false;
     }
     if (isKit) {
-      if (bagType.length && !bagType.includes(p.bagType)) return false;
+      const actualBagType = String(
+        p.bagType || p.subCategoryName || p.subCategory?.name || p.type || p.name || ""
+      ).toLowerCase();
+      if (bagType.length && !bagType.some((type) => actualBagType.includes(type.toLowerCase()))) return false;
     }
     if (minPrice !== "" && p.sellingPrice < Number(minPrice)) return false;
     if (maxPrice !== "" && p.sellingPrice > Number(maxPrice)) return false;
@@ -153,7 +292,7 @@ function CategoryPage() {
 
       <div style={styles.header}>
         <h1 style={styles.title}>
-          {category.charAt(0).toUpperCase() + category.slice(1)}
+          {collectionTitles[normalizedCategory] || category.charAt(0).toUpperCase() + category.slice(1)}
         </h1>
         <p style={styles.count}>{filtered.length} products found</p>
       </div>
@@ -201,43 +340,56 @@ function CategoryPage() {
             </Section>
             <Divider />
             <Section title="Weight">
-              {weightOptions.map((w) => (
-                <Checkbox key={w} label={w}
-                  checked={weight.includes(w)}
-                  onChange={() => toggle(weight, setWeight, w)} />
-              ))}
+             {weightOptions.map((w) => (
+                  <Checkbox
+                    key={w.value}
+                    label={w.label}
+                    checked={weight.includes(w.value)}
+                    onChange={() => toggle(weight, setWeight, w.value)}
+                  />
+                ))}
             </Section>
             <Divider />
             <Section title="Playing Level">
               {levelOptions.map((l) => (
-                <Checkbox key={l} label={l}
-                  checked={level.includes(l)}
-                  onChange={() => toggle(level, setLevel, l)} />
-              ))}
+                  <Checkbox
+                    key={l.value}
+                    label={l.label}
+                    checked={level.includes(l.value)}
+                    onChange={() => toggle(level, setLevel, l.value)}
+                  />
+                ))}
             </Section>
             <Divider />
           </>}
 
+          
           {/* ── SHOE ── */}
-          {isShoe && <>
-            <Section title="Size">
-              <div style={styles.sizeGrid}>
-                {shoeSizes.map((s) => (
-                  <button key={s}
-                    onClick={() => toggle(sizes, setSizes, s)}
-                    style={{
-                      ...styles.sizeBtn,
-                      background: sizes.includes(s) ? "#000" : "#f5f5f5",
-                      color:      sizes.includes(s) ? "#fff" : "#333",
-                      border:     sizes.includes(s) ? "1px solid #000" : "1px solid #e0e0e0",
-                    }}>
-                    {s.replace("UK ", "")}
-                  </button>
-                ))}
-              </div>
-            </Section>
-            <Divider />
-          </>}
+{isShoe && <>
+  <Section title="Size">
+    <div style={styles.sizeGrid}>
+      {shoeSizes.map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => toggle(sizes, setSizes, s)}
+          style={{
+            ...styles.sizeBtn,
+            background: sizes.includes(s) ? "#000" : "#f5f5f5",
+            color: sizes.includes(s) ? "#fff" : "#333",
+            border: sizes.includes(s)
+              ? "1px solid #000"
+              : "1px solid #e0e0e0",
+          }}
+        >
+          {s.replace("UK ", "")}
+        </button>
+      ))}
+    </div>
+  </Section>
+  <Divider />
+</>}
+          
 
           {/* ── SHUTTLE ── */}
           {isShuttle && <>
@@ -319,12 +471,22 @@ function CategoryPage() {
           {/* Price Range — all categories */}
           <Section title="Price (₹)">
             <div style={styles.priceRow}>
-              <input type="number" placeholder="Min" value={minPrice}
-                onChange={(e) => setMinPrice(e.target.value)}
+              <input type="number"  min="0" placeholder="Min" value={minPrice}
+                onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "" || Number(value) >= 0) {
+                      setMinPrice(value);
+                    }
+                  }}
                 style={styles.priceInput} />
               <span style={styles.priceSep}>—</span>
-              <input type="number" placeholder="Max" value={maxPrice}
-                onChange={(e) => setMaxPrice(e.target.value)}
+              <input type="number"  min="0" placeholder="Max" value={maxPrice}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || Number(value) >= 0) {
+                    setMaxPrice(value);
+                  }
+                }}
                 style={styles.priceInput} />
             </div>
           </Section>

@@ -22,29 +22,40 @@ const faqs = [
 export default function RacketRepair() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState([]);
-  const [form, setForm] = useState({ name: "", phone: "", date: "", notes: "" });
+  const [form, setForm] = useState({ name: "", phone: "", date: "", time: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [bookingError, setBookingError] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
 
   const toggle = (id) => setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   const selectedItems = repairTypes.filter((r) => selected.includes(r.id));
   const total = selectedItems.reduce((s, r) => s + r.price, 0);
+  const advanceAmount = Number((total * 0.5).toFixed(2));
+  const balanceAmount = Number((total - advanceAmount).toFixed(2));
 
   const handleBook = async () => {
-  if (!form.name || !form.phone || !form.date) return;
+  if (!form.name || !form.phone || !form.date || !form.time || selectedItems.length === 0) {
+    setBookingError("Please select at least one repair, date, and time slot.");
+    return;
+  }
+  setBookingError("");
   try {
     await addDoc(collection(db, "bookings"), {
       type: "repair",
       name: form.name,
       phone: form.phone,
       date: form.date,
+      time: form.time,
       notes: form.notes,
       services: selectedItems.map((i) => i.title),
       total,
-      status: "Pending",
+      advanceAmount,
+      balanceAmount,
+      paymentStatus: "Pending Payment",
+      status: "Pending Payment",
       createdAt: new Date().toISOString(),
     });
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error(e); setBookingError("We could not save your booking. Please try again."); return; }
   setSubmitted(true);
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
@@ -54,10 +65,10 @@ export default function RacketRepair() {
       <div style={pg.successPage}>
         <div style={pg.successBox}>
           <div style={pg.successIcon}>✓</div>
-          <h2 style={pg.successTitle}>Repair Booked!</h2>
+          <h2 style={pg.successTitle}>Repair Request Received</h2>
           <p style={pg.successSub}>
-            Hi <strong>{form.name}</strong>! Bring your racket on <strong>{form.date}</strong>.
-            Our technician will inspect and begin repairs immediately.
+            Hi <strong>{form.name}</strong>! Your repair request is for <strong>{form.date}</strong> at <strong>{form.time}</strong>.
+            This request is pending payment; the appointment is not confirmed yet.
           </p>
           {selectedItems.length > 0 && (
             <div style={pg.successDetails}>
@@ -69,10 +80,13 @@ export default function RacketRepair() {
               ))}
               <div style={{ ...pg.successRow, borderTop: "1px solid #222", paddingTop: "10px", marginTop: "4px", fontWeight: "800", fontSize: "16px" }}>
                 <span>Estimated Total</span>
-                <span style={{ color: "#00FF9C" }}>₹{total}</span>
+                <span style={{ color: "#00FF9C" }}>₹{total.toFixed(2)}</span>
               </div>
+              <div style={pg.successRow}><span>50% advance (online)</span><span style={{ color: "#00FF9C" }}>₹{advanceAmount.toFixed(2)}</span></div>
+              <div style={pg.successRow}><span>Balance at shop</span><span>₹{balanceAmount.toFixed(2)}</span></div>
             </div>
           )}
+          <p style={{ color: "#888", fontSize: "13px" }}>Online payment is not integrated yet. We will contact you to confirm next steps.</p>
           <button onClick={() => navigate("/")} style={pg.homeBtn}>← Back to Home</button>
         </div>
       </div>
@@ -167,6 +181,13 @@ export default function RacketRepair() {
                 <input type="date" style={pg.formInput} value={form.date} min={new Date().toISOString().split("T")[0]} onChange={(e) => setForm({ ...form, date: e.target.value })} />
               </div>
               <div style={pg.formGroup}>
+                <label style={pg.formLabel}>Preferred Time *</label>
+                <select style={pg.formInput} value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}>
+                  <option value="">Select time</option>
+                  {["9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM"].map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div style={pg.formGroup}>
                 <label style={pg.formLabel}>Describe the Problem</label>
                 <textarea style={{ ...pg.formInput, height: "90px", resize: "vertical" }} placeholder="e.g. cracked frame near throat, broken grommet on 3rd row..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
@@ -189,11 +210,14 @@ export default function RacketRepair() {
                 <span>Estimated Total</span>
                 <span style={{ color: "#00FF9C" }}>₹{total || "Free inspection"}</span>
               </div>
-              <div style={pg.summaryNote}>Final quote given after in-store inspection.</div>
+              <div style={pg.summaryItem}><span style={pg.summaryKey}>50% Advance</span><span style={{ ...pg.summaryVal, color: "#00FF9C" }}>₹{advanceAmount.toFixed(2)}</span></div>
+              <div style={pg.summaryItem}><span style={pg.summaryKey}>Balance at shop</span><span style={pg.summaryVal}>₹{balanceAmount.toFixed(2)}</span></div>
+              <div style={pg.summaryNote}>Payment gateway is not integrated yet. Booking remains pending payment.</div>
+              {bookingError && <p role="alert" style={{ color: "#ff6b6b", fontSize: "12px" }}>{bookingError}</p>}
               <button
                 onClick={handleBook}
-                disabled={!form.name || !form.phone || !form.date}
-                style={{ ...pg.bookBtn, opacity: (!form.name || !form.phone || !form.date) ? 0.5 : 1, cursor: (!form.name || !form.phone || !form.date) ? "not-allowed" : "pointer" }}
+                disabled={!form.name || !form.phone || !form.date || !form.time || selectedItems.length === 0}
+                style={{ ...pg.bookBtn, opacity: (!form.name || !form.phone || !form.date || !form.time || selectedItems.length === 0) ? 0.5 : 1, cursor: (!form.name || !form.phone || !form.date || !form.time || selectedItems.length === 0) ? "not-allowed" : "pointer" }}
               >
                 Book Repair Drop-off →
               </button>

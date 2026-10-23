@@ -68,8 +68,11 @@ const loadCart = async () => {
         toast.success("Product added to cart");
 
     } catch (error) {
-
         console.error(error);
+
+        toast.error(
+        error.response?.data || "Unable to add product to cart."
+    );
 
     }
 
@@ -92,8 +95,11 @@ const increaseQty = async (cartItemId) => {
     toast.success("Quantity updated");
 
   } catch (error) {
-
     console.error(error);
+
+    toast.error(
+        error.response?.data || "Unable to update quantity."
+    );
 
   }
 
@@ -125,7 +131,9 @@ const decreaseQty = async (cartItemId) => {
 
   } catch (error) {
 
-    console.error(error);
+   toast.error(
+        error.response?.data || "Unable to update quantity."
+    );
 
   }
 
@@ -145,6 +153,13 @@ const removeItem = async (cartItemId) => {
 
     console.error(error);
 
+    toast.error(
+        error.response?.data || "Unable to remove item."
+    );
+
+
+    
+
   }
 
 };
@@ -157,13 +172,18 @@ const clearCart = async () => {
     await clearCartApi(customerId);
      setCart([]);   // Clear React state immediately
     //await loadCart();
-    if (showToast) {
+    
       toast.success("Cart cleared");
-    }
+    
 
   } catch (error) {
 
     console.error(error);
+
+    toast.error(
+        error.response?.data || "Unable to clear cart."
+    );
+
 
   }
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useEffect } from "react";
 import ProductCard from "./ProductCard";
 
 export default function ProductDetailView({
@@ -34,6 +34,50 @@ export default function ProductDetailView({
     buyNow
 
 }) {
+
+    const categoryName = String(product?.category?.name || product?.categoryName || product?.category || "").toLowerCase().trim();
+    const isShoe = categoryName === "shoes";
+    const isClothing = categoryName === "clothing";
+
+    // Variant controls are driven by the actual variants returned by the API.
+    const variantColors = useMemo(() => {
+        return [...new Set((variants || []).map((variant) => variant.color || variant.colour).filter(Boolean))];
+    }, [variants]);
+    const variantSizes = useMemo(() => {
+        return [...new Set((variants || []).map((variant) => variant.size).filter(Boolean))];
+    }, [variants]);
+
+    const getImagesForColor = (colour) => {
+        if (!colour) return images || [];
+        const normalize = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const colourWords = String(colour).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+            .filter((word) => !["and", "with"].includes(word));
+        const compactColour = normalize(colour);
+        const matches = (images || []).filter((img) => {
+            const searchable = `${img.imageUrl || ""} ${img.altText || ""}`.toLowerCase();
+            const compactSearchable = normalize(searchable);
+            // Handles both "Black/Red" and filenames such as "BlackRed".
+            if (compactColour && compactSearchable.includes(compactColour)) return true;
+            // For multi-word colours, require every word to avoid mixing colour galleries.
+            return colourWords.length > 0 && colourWords.every((word) => compactSearchable.includes(word));
+        });
+        if (matches.length) return matches;
+        const primary = (images || []).filter((img) => img.primaryImage === true);
+        return primary.length ? primary.slice(0, 1) : (images || []).slice(0, 1);
+    };
+
+    const visibleImages = useMemo(() => {
+        if (!selectedVariant?.color) return images || [];
+        const matches = getImagesForColor(selectedVariant.color);
+        return matches.length ? matches : (images || []);
+    }, [images, selectedVariant?.color]);
+
+    useEffect(() => {
+        if (!selectedVariant?.color || !images?.length) return;
+        const colorImages = getImagesForColor(selectedVariant.color);
+        const nextImage = colorImages[0]?.imageUrl;
+        if (nextImage && nextImage !== selectedImage) setSelectedImage(nextImage);
+    }, [selectedVariant?.color, images]);
 
     if (loading) {
 
@@ -129,7 +173,7 @@ export default function ProductDetailView({
                         }}
                     >
 
-                        {images.map((img) => (
+                        {visibleImages.map((img) => (
 
                             <img
 
@@ -283,83 +327,227 @@ export default function ProductDetailView({
 
                     </div>
 
-                    <div
-                        style={{
-                            marginTop: "35px"
-                        }}
-                    >
+                    {/* CATEGORY VARIANTS: SIZE + COLOUR */}
 
-                        <h3
-                            style={{
-                                marginBottom: "15px"
-                            }}
-                        >
-                            Select Weight
-                        </h3>
+{(isShoe || variantColors.length > 0 || variantSizes.length > 0) && (
 
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: "15px",
-                                flexWrap: "wrap"
-                            }}
-                        >
+    <div style={{ marginTop: "35px" }}>
 
-                            {variants.map((variant) => (
+        {(isShoe || isClothing) && (variants || []).some((variant) => variant.size) && <> 
+        {/* SIZE */}
 
-                                <button
+        <h3 style={{ marginBottom: "15px" }}>
+            {isClothing ? "Clothing Size" : "Size"}
+        </h3>
 
-                                    key={variant.id}
+        <div
+            style={{
+                display: "flex",
+                gap: "12px",
+                flexWrap: "wrap"
+            }}
+        >
 
-                                    onClick={() =>
-                                        setSelectedVariant(variant)
-                                    }
+            {[
+                ...new Set(
+                    variants
+                        .filter((variant) => variant.stock > 0)
+                        .map((variant) => variant.size)
+                        .filter(Boolean)
+                )
+            ].map((size) => (
 
-                                    style={{
+                <button
+                    key={size}
 
-                                        padding: "12px 22px",
+                    onClick={() => {
 
-                                        cursor: "pointer",
+                        const firstVariant =
+                            variants.find(
+                                (variant) =>
+                                    variant.size === size &&
+                                    variant.stock > 0
+                            );
 
-                                        borderRadius: "8px",
+                        if (firstVariant) {
+                            setSelectedVariant(firstVariant);
+                        }
 
-                                        border:
+                    }}
 
-                                            selectedVariant?.id === variant.id
+                    style={{
+                        padding: "12px 20px",
+                        cursor: "pointer",
+                        borderRadius: "8px",
 
-                                                ? "2px solid black"
+                        border:
+                            selectedVariant?.size === size
+                                ? "2px solid black"
+                                : "1px solid #ccc",
 
-                                                : "1px solid #ccc",
+                        background:
+                            selectedVariant?.size === size
+                                ? "#000"
+                                : "#fff",
 
-                                        background:
+                        color:
+                            selectedVariant?.size === size
+                                ? "#fff"
+                                : "#000"
+                    }}
+                >
+                    {size}
+                </button>
 
-                                            selectedVariant?.id === variant.id
+            ))}
 
-                                                ? "#000"
+        </div>
 
-                                                : "#fff",
 
-                                        color:
+        </>}
 
-                                            selectedVariant?.id === variant.id
+        {/* COLOUR */}
 
-                                                ? "#fff"
+        <h3
+            style={{
+                marginTop: "25px",
+                marginBottom: "15px"
+            }}
+        >
+            Colour
+        </h3>
 
-                                                : "#000"
+        <div
+            style={{
+                display: "flex",
+                gap: "15px",
+                flexWrap: "wrap"
+            }}
+        >
 
-                                    }}
+{variantColors.map((colour) => {
 
-                                >
+    // Find this colour regardless of selected size
+    const colourVariant = variants.find(
+        (variant) =>
+            variant.color === colour
+    );
 
-                                    {variant.weight}
+    if (!colourVariant) {
+        return null;
+    }
 
-                                </button>
+    // Check whether this colour is available
+    // for the currently selected size
+const availableVariant = variants.find(
+    (variant) => variant.color === colour && variant.stock > 0 &&
+        (!selectedVariant?.size || variant.size === selectedVariant.size)
+) || variants.find((variant) => variant.color === colour && variant.stock > 0);
 
-                            ))}
+    const isAvailable =
+        !!availableVariant;
 
-                        </div>
+    const colourImages = getImagesForColor(colour);
 
-                    </div>
+    const thumbnail =
+        colourImages[0]?.imageUrl;
+
+    return (
+
+        <div
+            key={colour}
+            style={{
+                textAlign: "center",
+                opacity: isAvailable ? 1 : 0.45
+            }}
+        >
+
+            <button
+                disabled={!isAvailable}
+
+                onClick={() => {
+
+                    if (!isAvailable) {
+                        return;
+                    }
+
+                    setSelectedVariant(
+                        availableVariant
+                    );
+
+                    const nextImages = getImagesForColor(colour);
+                    if (nextImages.length) setSelectedImage(nextImages[0].imageUrl);
+
+                }}
+
+                style={{
+                    position: "relative",
+                    padding: "3px",
+                    borderRadius: "10px",
+
+                    cursor:
+                        isAvailable
+                            ? "pointer"
+                            : "not-allowed",
+
+                    border:
+                        selectedVariant?.color === colour &&
+                        isAvailable
+                            ? "3px solid black"
+                            : "1px solid #ddd",
+
+                    background: "#fff"
+                }}
+            >
+
+            {thumbnail && (
+
+    <img
+        src={thumbnail}
+        alt={colour}
+        style={{
+            width: "80px",
+            height: "80px",
+            objectFit: "cover",
+            borderRadius: "7px",
+
+            filter:
+                isAvailable
+                    ? "none"
+                    : "blur(2px) grayscale(40%)",
+
+            opacity:
+                isAvailable
+                    ? 1
+                    : 0.5
+        }}
+    />
+
+)}
+
+
+
+            </button>
+
+            <div
+                style={{
+                    marginTop: "6px",
+                    fontSize: "13px"
+                }}
+            >
+                {colour}
+            </div>
+
+        </div>
+
+    );
+
+})}
+        </div>
+
+    </div>
+
+)}
 
                                         <div
                         style={{

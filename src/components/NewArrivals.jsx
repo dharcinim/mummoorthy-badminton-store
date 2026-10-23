@@ -41,13 +41,21 @@ function NewArrivals() {
         </div>
       </div>
 
-      <div style={styles.scroll} ref={scrollRef}>
-        {products.map((item) => (
-          <div key={item.id} style={styles.cardWrapper}>
-            <ProductCard product={item} showNew={true} />
-          </div>
-        ))}
+      
+<div style={styles.scroll} ref={scrollRef}>
+  {products
+    .filter(
+      (item) =>
+        item.newArrival === true &&
+        item.active === true
+    )
+    .map((item) => (
+      <div key={item.id} style={styles.cardWrapper}>
+        <ProductCard product={item} showNew={true} />
       </div>
+    ))}
+</div>
+
 
     </div>
   );

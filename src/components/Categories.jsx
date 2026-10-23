@@ -2,14 +2,14 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 
 const categories = [
-  { name: "Rackets",      image: "/assets/Categories/Racket.png" },
-  { name: "Shoes",        image: "/assets/Categories/Shoe.png" },
-  { name: "Shuttlecocks", image: "/assets/Categories/Shuttle.png" },
-  { name: "Strings",      image: "/assets/Categories/String.png" },
-  { name: "Grips",        image: "/assets/Categories/Grip.png" },
-  { name: "Clothing",     image: "/assets/Categories/TShrit.png" },
-  { name: "Accessories",  image: "/assets/Categories/Socks.png" },
-  { name: "Kits",         image: "/assets/Categories/Kit.png" },
+  { name: "Rackets",      image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737330/Racket_ayhrrp.webp" },
+  { name: "Shoes",        image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737336/Shoe_uxibaz.webp" },
+  { name: "Shuttlecocks", image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737331/shuttle_v64xtb.webp" },
+  { name: "Strings",      image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737329/String_b1cop4.webp" },
+  { name: "Grips",        image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737327/Grip_oopi8b.webp" },
+  { name: "Clothing",     image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737330/TShrit_xz11ip.webp" },
+  { name: "Accessories",  image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737331/Socks_c3rkvb.webp" },  
+  { name: "Kits",         image: "https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737332/Kit_jhubxh.webp" },
 ];
 
 function Categories() {

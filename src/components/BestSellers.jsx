@@ -51,17 +51,21 @@ function BestSellers() {
         </div>
       </div>
 
-      <div style={styles.scroll} ref={scrollRef}>
-        {products
-          // Temporary: show all products
-          // Later we'll change this to:
-          // .filter((item) => item.bestSeller)
-          .map((item) => (
-            <div key={item.id} style={styles.cardWrapper}>
-              <ProductCard product={item} showBest={true} />
-            </div>
-          ))}
+      
+<div style={styles.scroll} ref={scrollRef}>
+  {products
+    .filter(
+      (item) =>
+        item.bestSeller === true &&
+        item.active === true
+    )
+    .map((item) => (
+      <div key={item.id} style={styles.cardWrapper}>
+        <ProductCard product={item} showBest={true} />
       </div>
+    ))}
+</div>
+
     </div>
   );
 }

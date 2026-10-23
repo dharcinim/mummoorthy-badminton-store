@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
-const categories = ["All", "Rackets", "Shoes", "Shuttles", "Bags", "Strings", "Grips"];
-const brands = ["All Brands", "Yonex", "Li-Ning", "Victor"];
+const categories = ["All", "Rackets", "Shoes", "Shuttlecocks", "Strings", "Grips", "Clothing", "Accessories", "Kit Bags", "Fitness Equipment"];
+const brands = ["All Brands", "Hundred", "Yonex", "Li-Ning", "Apacas", "Katana", "Young"];
 const sortOptions = [
   { label: "Newest", value: "newest" },
   { label: "Price: Low to High", value: "price_asc" },
@@ -11,6 +11,7 @@ const sortOptions = [
 ];
 
 function FilterBar({ filters, setFilters }) {
+  console.log("✅ FilterBar Rendered");
   const [priceRange, setPriceRange] = useState(filters.maxPrice || 20000);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -50,6 +51,9 @@ function FilterBar({ filters, setFilters }) {
       search: "",
       onlyNew: false,
       onlyBestSeller: false,
+      weight: "All",
+      flexibility: "All",
+      playingLevel: "All",
     });
   };
 
@@ -60,7 +64,7 @@ function FilterBar({ filters, setFilters }) {
         onClick={() => setMobileOpen(!mobileOpen)}
         style={styles.mobileToggle}
       >
-        {mobileOpen ? "✕ Close Filters" : "⚙ Filters & Sort"}
+        {mobileOpen ? "Close Filters" : "Filters & Sort"}
       </button>
 
       {/* ── Filter Panel ──────────────────────────────── */}
@@ -68,7 +72,7 @@ function FilterBar({ filters, setFilters }) {
 
         {/* Search */}
         <div style={styles.section}>
-          <label style={styles.label}>🔍 Search</label>
+          <label style={styles.label}>Search</label>
           <input
             type="text"
             placeholder="Search products..."
@@ -130,6 +134,77 @@ function FilterBar({ filters, setFilters }) {
           </div>
         </div>
 
+        {/* Weight */}
+        <div style={styles.section}>
+          <label style={styles.label}>Weight</label>
+
+          <select
+            name="weightFilter"
+            autoComplete="off"
+            value={filters.weight}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                weight: e.target.value,
+              }))
+            }
+            style={styles.select}
+          >
+            <option value="All">All</option>
+            <option value="4U">4U</option>
+            <option value="5U">5U</option>
+          </select>
+        </div>
+
+            {/* Flexibility */}
+          <div style={styles.section}>
+            <label style={styles.label}>Flexibility</label>
+
+            <select
+             name="flexibilityFilter"
+              autoComplete="off"
+              value={filters.flexibility}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  flexibility: e.target.value,
+                }))
+              }
+              style={styles.select}
+            >
+              <option value="All">All</option>
+              <option value="Flexible">Flexible</option>
+              <option value="Medium">Medium</option>
+              <option value="Stiff">Stiff</option>
+            </select>
+          </div>
+
+          {/* Playing Level */}
+        <div style={styles.section}>
+          <label style={styles.label}>Playing Level</label>
+
+          <select
+          name="playingLevelFilter"
+          autoComplete="off"
+            value={filters.playingLevel}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                playingLevel: e.target.value,
+              }))
+            }
+            style={styles.select}
+          >
+            <option value="All">All</option>
+            <option value="Beginner">Beginner</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Intermediate to Advanced">
+              Intermediate to Advanced
+            </option>
+            <option value="Professional">Professional</option>
+          </select>
+        </div>
+
         {/* Price Range */}
         <div style={styles.section}>
           <label style={styles.label}>
@@ -160,7 +235,7 @@ function FilterBar({ filters, setFilters }) {
                 checked={filters.onlyNew || false}
                 onChange={() => handleToggle("onlyNew")}
               />
-              <span style={styles.toggleLabel}>🆕 New Arrivals</span>
+              <span style={styles.toggleLabel}>New Arrivals</span>
             </label>
             <label style={styles.toggle}>
               <input
@@ -168,7 +243,7 @@ function FilterBar({ filters, setFilters }) {
                 checked={filters.onlyBestSeller || false}
                 onChange={() => handleToggle("onlyBestSeller")}
               />
-              <span style={styles.toggleLabel}>🏆 Best Sellers</span>
+              <span style={styles.toggleLabel}>Best Sellers</span>
             </label>
           </div>
         </div>

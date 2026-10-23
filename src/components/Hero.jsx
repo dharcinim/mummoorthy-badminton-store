@@ -1,7 +1,12 @@
-import React from "react";
 
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import BulkEnquiry from "../pages/BulkEnquiry"; 
 
 function Hero() {
+  const navigate = useNavigate();
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
+
   return (
     <div style={styles.hero}>
 
@@ -30,7 +35,9 @@ function Hero() {
             onMouseLeave={(e) => {
               e.target.style.background = "#1e6cff";
               e.target.style.transform = "scale(1)";
+
             }}
+            onClick={() => navigate("/products")}
           >
             Explore Products
           </button>
@@ -47,6 +54,7 @@ function Hero() {
               e.target.style.color = "#00e676";
               e.target.style.transform = "scale(1)";
             }}
+            onClick={() => setIsBulkOpen(true)}
           >
             Bulk Enquiry
           </button>
@@ -54,6 +62,7 @@ function Hero() {
         </div>
 
       </div>
+      <BulkEnquiry isOpen={isBulkOpen} onClose={() => setIsBulkOpen(false)} />
     </div>
   );
 }
@@ -64,7 +73,7 @@ const styles = {
     position: "relative",
     width: "100%",
     height: "550px",
-    backgroundImage: `url(/assets/Hero.jpg)`, // 🔥 change to your image path
+    backgroundImage: `url(https://res.cloudinary.com/hwrjcjaf/image/upload/v1792737368/Hero_tmtn1e.webp)`, // 🔥 change to your image path
     backgroundSize: "cover",
     backgroundPosition: "center",
     display: "flex",

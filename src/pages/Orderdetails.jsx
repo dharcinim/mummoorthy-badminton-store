@@ -126,6 +126,10 @@ function PageStyles() {
         color: ${COLORS.hoverGreen} !important;
       }
       .odp-primary-btn:hover { background-color: ${COLORS.hoverGreen} !important; }
+      .odp-cancel-btn:hover {
+        background-color: #DC2626 !important;
+        color: #FFFFFF !important;
+      }
       .odp-product-card:hover {
         box-shadow: 0 8px 20px rgba(0,0,0,0.08) !important;
         border-color: #CFF3DC !important;
@@ -284,11 +288,8 @@ function TrackingTimeline({ status }) {
 }
 
 function ProductCard({ item, navigate , addToCart }) {
-  const variant = item?.productVariant;
-  const product = variant?.product;
-  const primaryImage =
-    product?.productImages?.find((img) => img.primaryImage)?.imageUrl ||
-    product?.productImages?.[0]?.imageUrl;
+ 
+  const primaryImage = item.productImageUrl;
 
   const lineTotal = (item?.price ?? 0) * (item?.quantity ?? 0);
 
@@ -310,8 +311,8 @@ function ProductCard({ item, navigate , addToCart }) {
     >
       <div
         style={{
-          height: 112,
-          width: 112,
+          height: 140,
+          width: 140,
           flexShrink: 0,
           overflow: "hidden",
           borderRadius: 10,
@@ -319,17 +320,18 @@ function ProductCard({ item, navigate , addToCart }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          padding: 8,
         }}
       >
         {primaryImage ? (
           <img
             className="odp-product-img"
             src={primaryImage}
-            alt={product?.name || "Product"}
+            alt={item.productName  || "Product"}
             style={{
               height: "100%",
               width: "100%",
-              objectFit: "cover",
+              objectFit: "contain",
               transition: "transform 0.3s ease",
             }}
           />
@@ -350,7 +352,7 @@ function ProductCard({ item, navigate , addToCart }) {
               margin: 0,
             }}
           >
-            {product?.brand?.name}
+            {item.brandName}
           </p>
           <h3
             style={{
@@ -360,7 +362,7 @@ function ProductCard({ item, navigate , addToCart }) {
               margin: "2px 0 0 0",
             }}
           >
-            {product?.name}
+            {item.productName}
           </h3>
           <div
             style={{
@@ -373,9 +375,9 @@ function ProductCard({ item, navigate , addToCart }) {
               color: COLORS.textSecondary,
             }}
           >
-            {variant?.weight && <span>Weight: {variant.weight}</span>}
-            {variant?.gripSize && <span>Grip: {variant.gripSize}</span>}
-            <span>Qty: {item?.quantity}</span>
+            {item.weight && <span>Weight: {item.weight}</span>}
+            {item.gripSize && <span>Grip: {item.gripSize}</span>}
+            <span>Qty: {item.quantity}</span>
           </div>
         </div>
 
@@ -397,15 +399,17 @@ function ProductCard({ item, navigate , addToCart }) {
               {formatCurrency(lineTotal)}
             </p>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="button-group" style={{ display: "flex", gap: 8 }}>
             <button
               className="odp-outline-btn"
-              onClick={() => navigate(`/products/${product.id}`)}
+              onClick={() => navigate(`/products/${item.productId}`)}
               style={{
+                height: 38,
+                minWidth: 128,
                 borderRadius: 10,
                 border: `1px solid ${COLORS.border}`,
                 backgroundColor: "transparent",
-                padding: "8px 14px",
+                padding: "0 14px",
                 fontSize: 13,
                 fontWeight: 600,
                 color: COLORS.textPrimary,
@@ -417,10 +421,23 @@ function ProductCard({ item, navigate , addToCart }) {
             </button>
             <button
               className="odp-primary-btn"
+              style={{
+                height: 38,
+                minWidth: 128,
+                borderRadius: 10,
+                border: "none",
+                backgroundColor: COLORS.accentGreen,
+                padding: "0 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                color: COLORS.buttonText,
+                cursor: "pointer",
+                transition: "background-color 0.2s ease",
+              }}
               onClick={async () => {
 
                 await addToCart({
-                    productVariantId: variant.id,
+                    productVariantId: item.productVariantId,
                     quantity: 1
                 });
 
@@ -443,17 +460,6 @@ function ProductCard({ item, navigate , addToCart }) {
               toast.success("Added to cart 🛒");
 
             }}
-              style={{
-                borderRadius: 10,
-                border: "none",
-                backgroundColor: COLORS.accentGreen,
-                padding: "8px 14px",
-                fontSize: 13,
-                fontWeight: 600,
-                color: COLORS.buttonText,
-                cursor: "pointer",
-                transition: "background-color 0.2s ease",
-              }}
             >
               Buy Again
             </button>
@@ -680,7 +686,7 @@ export default function OrderDetails() {
     doc.setFontSize(10);
     doc.setTextColor(80);
 
-    doc.text(`Invoice No : INV-${order.id}`, 14, 30);
+    doc.text(`Invoice No : INV-${order.orderId}`, 14, 30);
     doc.text(`Order No : ${order.orderNumber}`, 14, 36);
     doc.text(`Date : ${formatDate(order.orderDate)}`, 14, 42);
 
@@ -692,17 +698,17 @@ export default function OrderDetails() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
 
-    doc.text(`Name : ${order.customer?.fullName || "-"}`, 14, 63);
+    doc.text(`Name : ${order.shippingAddress?.fullName || "-"}`, 14, 63);
     doc.text(`Email : ${order.customer?.email || "-"}`, 14, 70);
-    doc.text(`Phone : ${order.customer?.phoneNumber || "-"}`, 14, 77);
+    doc.text(`Phone : ${order.shippingAddress?.phoneNumber || "-"}`, 14, 77);
 
     // ---------- Product Table ----------
     autoTable(doc, {
       startY: 88,
       head: [["Product", "Variant", "Qty", "Price", "Total"]],
       body: items.map((item) => [
-        item.productVariant?.product?.name || "-",
-        `${item.productVariant?.weight || ""} ${item.productVariant?.gripSize || ""}`,
+        item.productName || "-",
+         `${item.weight || ""} ${item.gripSize || ""}`,
         item.quantity,
         formatCurrency(item.price),
         formatCurrency(item.price * item.quantity),
@@ -790,7 +796,7 @@ const handleCancelOrder = async () => {
 
     try {
 
-        const updatedOrder = await cancelOrder(order.id);
+        const updatedOrder = await cancelOrder(order.orderId);
 
         setOrder(updatedOrder);
 
@@ -1022,7 +1028,7 @@ const handleCancelOrder = async () => {
                     <User size={16} />
                   </span>
                   <span style={{ fontWeight: 500, color: COLORS.textPrimary }}>
-                    {order?.customer?.fullName}
+                    {order?.shippingAddress?.fullName || "N/A"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1042,7 +1048,7 @@ const handleCancelOrder = async () => {
                     <Phone size={16} />
                   </span>
                   <span style={{ color: COLORS.textSecondary }}>
-                    {order?.customer?.phoneNumber}
+                    {order?.shippingAddress?.phoneNumber || "N/A"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1067,6 +1073,50 @@ const handleCancelOrder = async () => {
                 </div>
               </div>
             </SectionCard>
+
+          
+          <SectionCard title="Shipping Address">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <MapPin size={18} color={COLORS.hoverGreen} />
+                <div>
+
+                  <div style={{ fontWeight: "600" }}>
+                    {order?.shippingAddress?.fullName}
+                  </div>
+
+                  <div style={{ color: COLORS.textSecondary }}>
+                    {order?.shippingAddress?.phoneNumber}
+                  </div>
+
+                  <div style={{ marginTop: 8 }}>
+                    {order?.shippingAddress?.addressLine1}
+                  </div>
+
+                  {order?.shippingAddress?.addressLine2 && (
+                    <div>
+                      {order.shippingAddress.addressLine2}
+                    </div>
+                  )}
+
+                  <div>
+                    {order?.shippingAddress?.city},{" "}
+                    {order?.shippingAddress?.state}
+                  </div>
+
+                  <div>
+                    {order?.shippingAddress?.country} -{" "}
+                    {order?.shippingAddress?.postalCode}
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          </SectionCard>
+
+
 
             {/* Order summary */}
             <SectionCard title="Order Summary">
@@ -1131,18 +1181,20 @@ const handleCancelOrder = async () => {
                 {["PENDING", "CONFIRMED", "PLACED"].includes(order.status) && (
 
 <button
+    className="odp-cancel-btn"
     onClick={handleCancelOrder}
     style={{
         width: "100%",
         marginTop: "12px",
         padding: "12px",
-        background: "#E53935",
-        color: "#fff",
-        border: "none",
+        background: "transparent",
+        color: "#DC2626",
+        border: "1px solid #DC2626",
         borderRadius: "10px",
         cursor: "pointer",
         fontWeight: "600",
         fontSize: "15px",
+        transition: "background-color 0.2s ease, color 0.2s ease",
     }}
 >
     Cancel Order
@@ -1153,39 +1205,60 @@ const handleCancelOrder = async () => {
 
             {/* Payment info */}
             <SectionCard title="Payment Information">
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  borderRadius: 12,
-                  backgroundColor: "#E8F9EE",
-                  padding: "14px 16px",
-                }}
-              >
-                <span
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div
                   style={{
                     display: "flex",
-                    height: 36,
-                    width: 36,
                     alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "50%",
-                    backgroundColor: COLORS.cardBg,
-                    color: COLORS.hoverGreen,
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-                    flexShrink: 0,
+                    gap: 12,
+                    borderRadius: 12,
+                    backgroundColor: "#E8F9EE",
+                    padding: "14px 16px",
                   }}
                 >
-                  <CreditCard size={16} />
-                </span>
-                <div>
-                  <p style={{ fontSize: 12, color: COLORS.textSecondary, margin: 0 }}>
-                    Payment Method
-                  </p>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, margin: "2px 0 0 0" }}>
-                    Cash on Delivery
-                  </p>
+                  <span
+                    style={{
+                      display: "flex",
+                      height: 36,
+                      width: 36,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "50%",
+                      backgroundColor: COLORS.cardBg,
+                      color: COLORS.hoverGreen,
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <CreditCard size={16} />
+                  </span>
+                  <div>
+                    <p style={{ fontSize: 12, color: COLORS.textSecondary, margin: 0 }}>
+                      Payment Method
+                    </p>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, margin: "2px 0 0 0" }}>
+                      Cash on Delivery
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px", fontSize: 14 }}>
+                  <span style={{ color: COLORS.textSecondary }}>Payment Status</span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: order?.status === "CANCELLED" ? "#DC2626" : "#16A34A",
+                    }}
+                  >
+                    {order?.status === "CANCELLED" ? "Refunded" : "Pending (COD)"}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 4px", fontSize: 14 }}>
+                  <span style={{ color: COLORS.textSecondary }}>Order Status</span>
+                  <span style={{ fontWeight: 600, color: COLORS.textPrimary }}>
+                    {STATUS_LABELS[order?.status] || order?.status}
+                  </span>
                 </div>
               </div>
             </SectionCard>

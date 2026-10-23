@@ -94,7 +94,12 @@ function Checkout() {
 
     console.error(error);
 
-    toast.error("Unable to place order.");
+    const message =
+        error.response?.data?.message ||
+        error.response?.data ||
+        "Unable to place order.";
+
+    toast.error(message);
 
   }
 
@@ -136,8 +141,8 @@ function Checkout() {
         {orderId && <p style={s.orderIdText}>Order ID: <strong>#{orderId.slice(0, 8).toUpperCase()}</strong></p>}
         <div style={s.successBtns}>
           <button onClick={() => navigate("/")} style={s.homeBtn}>Continue Shopping</button>
-          <button onClick={() => navigate("/tracking")} style={{ ...s.homeBtn, background: "#00c853" }}>
-            Track Order →
+          <button onClick={() => navigate("/orders")} style={{ ...s.homeBtn, background: "#00c853" }}>
+            View Order Details →
           </button>
         </div>
       </div>

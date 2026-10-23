@@ -21,14 +21,32 @@ export function AuthProvider({ children }) {
   const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
     if (firebaseUser) {
 
-      const backendCustomer = await getCustomerByFirebaseUid(firebaseUser.uid);
+      let backendCustomer = await getCustomerByFirebaseUid(firebaseUser.uid);
 
-      setUser({
-        uid: firebaseUser.uid,
-        customerId: backendCustomer.id,
-        email: firebaseUser.email,
-        name: firebaseUser.displayName || backendCustomer.fullName || "",
-      });
+        if (!backendCustomer) {
+
+            console.log("Customer not found. Creating...");
+
+            const customerPayload = {
+                firebaseUid: firebaseUser.uid,
+                fullName: firebaseUser.displayName || "",
+                email: firebaseUser.email,
+                phoneNumber: "",
+                profileImage: "",
+                active: true,
+            };
+
+            backendCustomer = await createCustomer(customerPayload);
+
+            console.log("Customer created:", backendCustomer);
+        }
+
+        setUser({
+            uid: firebaseUser.uid,
+            customerId: backendCustomer.id,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || backendCustomer.fullName || "",
+        });
 
     } else {
       setUser(null);
@@ -72,7 +90,7 @@ const customer = await createCustomer(customerPayload);
 console.log("Customer Response:", customer);
     
 
-    console.log("Customer created:", customerData);
+    console.log("Customer created:", customer);
     //await createCustomer(customerData);
     setUser({
       uid: result.user.uid,
@@ -91,19 +109,34 @@ console.log("Customer Response:", customer);
     const result = await signInWithEmailAndPassword(auth, email, password);
 
     // Get customer from Spring Boot
-    const backendCustomer = await getCustomerByFirebaseUid(result.user.uid);
+    let backendCustomer = await getCustomerByFirebaseUid(result.user.uid);
 
-    console.log("Backend Customer JSON:", JSON.stringify(backendCustomer));
-    console.log("Backend Customer ID:", backendCustomer?.id);
-    console.log("Firebase UID:", result.user.uid);
+      if (!backendCustomer) {
 
-    // Store user in React Context
-    setUser({
-      uid: result.user.uid,
-      customerId: backendCustomer.id,
-      email: result.user.email,
-      name: result.user.displayName || backendCustomer.fullName || "",
-    });
+          console.log("Customer not found. Creating new customer...");
+
+          const customerPayload = {
+              firebaseUid: result.user.uid,
+              fullName: result.user.displayName || "",
+              email: result.user.email,
+              phoneNumber: "",
+              profileImage: "",
+              active: true,
+          };
+
+          backendCustomer = await createCustomer(customerPayload);
+
+          console.log("New Customer Created:", backendCustomer);
+      }
+
+      console.log("Backend Customer:", backendCustomer);
+
+      setUser({
+          uid: result.user.uid,
+          customerId: backendCustomer.id,
+          email: result.user.email,
+          name: result.user.displayName || backendCustomer.fullName,
+      });
 
     return true;
   } catch (error) {

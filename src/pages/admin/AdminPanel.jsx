@@ -227,7 +227,7 @@ export default function AdminPanel() {
                   {recentBookings.map((booking) => (
                     <tr key={booking.id} style={s.tr}>
                       <td style={s.td}>{booking.name}</td>
-                      <td style={s.td} style={{ textTransform: "capitalize" }}>{booking.type}</td>
+                      <td style={{ ...s.td, textTransform: "capitalize" }}>{booking.type}</td>
                       <td style={s.td}>{booking.date}</td>
                       <td style={s.td}>
                         <span style={{ ...s.statusBadge, ...getStatusStyle(booking.status) }}>
